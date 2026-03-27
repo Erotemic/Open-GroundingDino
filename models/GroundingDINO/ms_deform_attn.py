@@ -27,6 +27,7 @@ from torch.nn.init import constant_, xavier_uniform_
 
 try:
     # from groundingdino import _C
+    # Note: this repo does not setup where this belongs properly
     import MultiScaleDeformableAttention as _C
 except Exception:
     warnings.warn("Failed to load custom C++ ops. Running on CPU mode Only!")
@@ -328,7 +329,7 @@ class MultiScaleDeformableAttention(nn.Module):
                     reference_points.shape[-1]
                 )
             )
-    
+
         if torch.cuda.is_available() and value.is_cuda:
             halffloat = False
             if value.dtype == torch.float16:
@@ -337,14 +338,15 @@ class MultiScaleDeformableAttention(nn.Module):
                 sampling_locations = sampling_locations.float()
                 attention_weights = attention_weights.float()
 
-            output = MultiScaleDeformableAttnFunction.apply(
-                value,
-                spatial_shapes,
-                level_start_index,
-                sampling_locations,
-                attention_weights,
-                self.im2col_step,
-            )
+            with FailsafeContext(enabled=False, device=value.device):
+                output = MultiScaleDeformableAttnFunction.apply(
+                    value,
+                    spatial_shapes,
+                    level_start_index,
+                    sampling_locations,
+                    attention_weights,
+                    self.im2col_step,
+                )
 
             if halffloat:
                 output = output.half()
@@ -359,6 +361,23 @@ class MultiScaleDeformableAttention(nn.Module):
             output = output.permute(1, 0, 2)
 
         return output
+
+
+class FailsafeContext:
+    def __init__(self, enabled=True, device=0):
+        self.enabled = enabled
+        self.device = device
+
+    def __enter__(self):
+        if self.enabled:
+            torch.cuda.set_device(self.device)
+            torch.cuda.reset_peak_memory_stats()
+            torch.cuda.empty_cache()
+
+    def __exit__(self, a, b, c):
+        if self.enabled:
+            torch.cuda.synchronize()
+            torch.cuda.reset_peak_memory_stats()
 
 
 def create_dummy_class(klass, dependency, message=""):
