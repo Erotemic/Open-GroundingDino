@@ -4,6 +4,8 @@ forked state.
 
 This just builds the deformable attention module, it doesn't set this repo up
 in dev mode. I don't think that's possible right now.
+
+TODO: we probably should update our fork so it is a real python module.
 "
 uv pip install -r tmp_requirements.txt
 
