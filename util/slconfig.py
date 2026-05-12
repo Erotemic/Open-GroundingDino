@@ -314,7 +314,13 @@ class SLConfig(object):
             based_on_style='pep8',
             blank_line_before_nested_class_or_def=True,
             split_before_expression_after_opening_paren=True)
-        text, _ = FormatCode(text, style_config=yapf_style, verify=True)
+        try:
+            text, _ = FormatCode(text, style_config=yapf_style, verify=True)
+        except TypeError as ex:
+            if 'verify' not in str(ex):
+                raise
+            # yapf>=0.40 removed the verify kwarg.
+            text, _ = FormatCode(text, style_config=yapf_style)
 
         return text
     
@@ -437,4 +443,3 @@ class DictAction(Action):
                 val = val[0]
             options[key] = val
         setattr(namespace, self.dest, options)
-
